@@ -213,7 +213,7 @@ void Battery::paintEvent(QPaintEvent *)
         if (time_per1 != -1) {
             int sec = time_per1 * s;
             QTime t2(0,0,0); t2 = t2.addSecs(sec);
-            timeleft = "\nTime left: " + t2.toString("h") + " h " + t2.toString("m") + " min";
+            timeleft = "\nTime left: " + t2.toString("h") + " h " + t2.toString("m") + " m " + t2.toString("s") + " s";
         }
     } else if (isCharging() && time_ch1 != -1) {
         QTime t1(0,0,0); t1 = t1.addSecs(time_ch1 * (100-s));
