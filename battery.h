@@ -1,7 +1,5 @@
-#ifndef BATTERY_H
-#define BATTERY_H
-
-#include <QtWidgets>
+#pragma once
+#include <fstream>
 #include "optionswnd.h"
 
 
@@ -9,9 +7,10 @@ class Battery : public QWidget
 {
     Q_OBJECT
     QPixmap *empty_battery;
-    QTime time, time2;
+    QElapsedTimer elapsedTimer;
     int m_ac, m_ac2, saved_status;
     double time_per1, time_ch1;
+    bool configChanged;
 public:
     Battery(QWidget *parent = 0);
     ~Battery();
@@ -41,5 +40,3 @@ protected:
     void keyPressEvent(QKeyEvent *);
     void mouseDoubleClickEvent(QMouseEvent *event);
 };
-
-#endif // BATTERY_H

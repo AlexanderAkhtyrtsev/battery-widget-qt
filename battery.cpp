@@ -1,11 +1,5 @@
 #include "battery.h"
 
-#ifdef _DEBUG
-#include <fstream>
-using namespace std;
-#endif
-
-
 Battery::Battery(QWidget *parent)
     : QWidget(parent)
 {
@@ -14,7 +8,8 @@ Battery::Battery(QWidget *parent)
     saved_status = -1;
     time_per1 = -1;
     time_ch1 = -1;
-    settings = new QSettings("AlexanderV2", "Battery Widget");
+    configChanged = false;
+    settings = new QSettings("AlexanderAkhtyrtsev", "Battery Widget");
     resize( settings->value("wsize", QSize(45, 90)).toSize());
     setWindowFlags(Qt::Window|Qt::FramelessWindowHint|Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground);
@@ -25,12 +20,11 @@ Battery::Battery(QWidget *parent)
     setWindowFlag(Qt::WindowStaysOnTopHint, settings->value("ontop", false).toBool());
 
     timer = new QTimer(this);
-    timer->setInterval(100);
+    timer->setInterval(2000);
     QObject::connect(timer, SIGNAL(timeout()), this, SLOT(check()));
     timer->start();
 
-    int w = QApplication::desktop()->width();
-    move(settings->value("wpos", QPoint(w - width() - 10, 40)).toPoint());
+    move(settings->value("wpos", QPoint(QApplication::desktop()->width() - width() - 10, 40)).toPoint());
 }
 
 Battery::~Battery()
@@ -43,11 +37,25 @@ Battery::~Battery()
 
 int Battery::getStatus()
 {
+
+#ifdef Q_OS_WIN
     SYSTEM_POWER_STATUS ps;
     GetSystemPowerStatus(&ps);
-#ifndef _DEBUG
-    return qMin(100, (int) ps.BatteryLifePercent);
-#else
+    return ps.BatteryLifePercent;
+#endif
+
+#ifdef Q_OS_LINUX
+    std::ifstream ifs("/sys/class/power_supply/BAT0/capacity");
+    int percent;
+    if (!ifs.is_open()) {
+        return -1;
+    }
+    ifs >> percent;
+    ifs.close();
+    return percent;
+#endif
+
+#ifdef _DEBUG
     ifstream in("in.txt");
     if (!in) qDebug() << "oops";
     int status; in >> status; in.close();
@@ -57,33 +65,40 @@ int Battery::getStatus()
 
 bool Battery::isConnected() const
 {
+#ifdef Q_OS_WIN
     SYSTEM_POWER_STATUS ps;
     GetSystemPowerStatus(&ps);
-#ifndef _DEBUG
     return ps.BatteryFlag < 128;
-#else
-    ifstream in("in.txt");
-    int tmp;
-    bool status; in >> tmp >> status; in.close();
-    return status;
+#endif
+
+#ifdef Q_OS_LINUX
+    std::ifstream in("/sys/class/power_supply/BAT0/status");
+    if (in.is_open()) {
+        in.close();
+        return true;
+    }
+    return false;
 #endif
 }
 
-
-
 bool Battery::isCharging()
 {
+#ifdef Q_OS_WIN
 
     SYSTEM_POWER_STATUS ps;
     GetSystemPowerStatus(&ps);
-#ifndef _DEBUG
     m_ac = ps.ACLineStatus;
     return ps.BatteryFlag & 8;
-#else
-    ifstream in("in.txt");
-    int tmp;
-    bool status; in >> tmp >> status >> status >> m_ac; in.close();
-    return status;
+#endif
+#ifdef Q_OS_LINUX
+    std::ifstream in("/sys/class/power_supply/BAT0/status");
+    if (in.is_open()) {
+        std::string status;
+        in >> status;
+        in.close();
+        return (status == "true");
+    }
+    return false;
 #endif
 }
 
@@ -112,23 +127,21 @@ void Battery::check()
         repaint();
     }
     else if (!isHidden()) {
-        hide();
+      //  hide();
     }
 
     if (!m_ac) {
         if (m_ac != m_ac2) { // when ac disconnected
             m_ac2 = m_ac;
-            time  = QTime::currentTime();
-            time.restart();
+            elapsedTimer.restart();
         }
 
         if (saved_status == -1) {
-            time2  = QTime::currentTime();
-            time2.restart();
+            elapsedTimer.restart();
             saved_status = getStatus();
         }
         else if (saved_status != getStatus())  {
-            time_per1 = time2.elapsed() / 1000.0 / (saved_status - getStatus());
+            time_per1 = elapsedTimer.elapsed() / 1000.0 / (saved_status - getStatus());
             saved_status = -1;
         }
 
@@ -139,12 +152,11 @@ void Battery::check()
         }
         if (isCharging()) {
             if (saved_status == -1){
-                time  = QTime::currentTime();
-                time.restart();
+                elapsedTimer.restart();
                 saved_status = getStatus();
             } else {
                 if (saved_status != getStatus()) {
-                    time_ch1 = time.elapsed() / 1000.0 / (getStatus() - saved_status);
+                    time_ch1 = elapsedTimer.elapsed() / 1000.0 / (getStatus() - saved_status);
                     saved_status = -1;
                 }
             }
@@ -153,19 +165,28 @@ void Battery::check()
         }
     }
 
+
+    if (configChanged) {
+        settings->setValue("opacity", m_opacity);
+        settings->setValue("ontop",  static_cast<bool>(this->windowFlags() & Qt::WindowStaysOnTopHint));
+        settings->setValue("wpos", this->pos());
+        settings->setValue("wsize", this->size());
+        configChanged = false;
+    }
+
 }
 
 void Battery::setOpacity(int opacity)
 {
     m_opacity = opacity;
-    settings->setValue("opacity", opacity);
+    configChanged = true;
     this->repaint();
 }
 
 void Battery::pinOnTop(bool b)
 {
-    settings->setValue("ontop", b);
     setWindowFlag(Qt::WindowStaysOnTopHint, b);
+    configChanged = true;
 }
 
 void Battery::paintEvent(QPaintEvent *)
@@ -201,14 +222,14 @@ void Battery::paintEvent(QPaintEvent *)
     }
 
     QFont fnt = painter.font();
-    fnt.setPixelSize(rect().height() * 0.18);
+    fnt.setPixelSize(rect().height() * 0.15);
     QFontMetrics fmt(fnt);
 
     QString percentage = QString::number(s) + "%";
     //TODO: timeleft
     QString onBatteryStr = "", timeleft = "", timeUntilful = "";
     if (!m_ac) {
-        QTime t1(0,0,0); t1 = t1.addSecs(time.elapsed() / 1000);
+        QTime t1(0,0,0); t1 = t1.addSecs(elapsedTimer.elapsed() / 1000);
        onBatteryStr = "\nOn battery: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
         if (time_per1 != -1) {
             int sec = time_per1 * s;
@@ -220,7 +241,7 @@ void Battery::paintEvent(QPaintEvent *)
         timeUntilful = "\nUntil Full: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
     }
     this->setToolTip(QString(percentage+timeUntilful+onBatteryStr+timeleft).replace(QRegExp("[\\s]0[\\s][hms]"), ""));
-    int fw = fmt.width(percentage);
+    int fw = fmt.horizontalAdvance(percentage);
     painter.setFont(fnt);
     painter.setPen(QPen(Qt::black));
     painter.drawText(QRect(rect().width() / 2 - fw/2, rect().height()/2 - fmt.height()/2, fw, fmt.height()), percentage);
@@ -234,8 +255,7 @@ void Battery::wheelEvent(QWheelEvent *pe)
     resize( qMax(35, qMin(width()+d/2, 100)), qMax(70, qMin(height()+d, 200)) );
     QPoint position = validPos(pos());
     move( position );
-    settings->setValue("wpos", position);
-    settings->setValue("wsize", size());
+    configChanged = true;
 }
 
 void Battery::mousePressEvent(QMouseEvent *event) {
@@ -247,13 +267,14 @@ void Battery::mouseMoveEvent(QMouseEvent *event) {
     QPoint pos( event->globalX() - m_mc_x, event->globalY() - m_mc_y);
     QPoint position = validPos(pos);
     move( position );
-    settings->setValue("wpos", position);
+    configChanged = true;
 }
 
 void Battery::keyPressEvent(QKeyEvent *pe)
 {
     switch(pe->key()) {
     case Qt::Key_Escape:
+        timer->stop();
         exit(0);
         break;
     }

@@ -31,7 +31,5 @@ SOURCES += main.cpp\
 HEADERS  += battery.h \
     optionswnd.h
 
-DISTFILES +=
-QMAKE_LFLAGS_RELEASE += -static -static-libgcc
-RESOURCES += \
-    res.qrc
+#QMAKE_LFLAGS_RELEASE += -static -static-libgcc
+RESOURCES += res.qrc

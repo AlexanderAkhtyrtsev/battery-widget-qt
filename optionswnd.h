@@ -1,4 +1,5 @@
 #pragma once
+
 #include <QtWidgets>
 class Battery;
 
@@ -12,9 +13,5 @@ class OptionsWnd : public QWidget
     Battery *battery;
 public:
     explicit OptionsWnd(Battery *parent = 0);
-
-signals:
-
-public slots:
 };
 
