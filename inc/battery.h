@@ -1,5 +1,6 @@
 #pragma once
 #include <fstream>
+using std::fstream;
 #include "optionswnd.h"
 
 

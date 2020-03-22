@@ -56,7 +56,7 @@ int Battery::getStatus()
 #endif
 
 #ifdef _DEBUG
-    ifstream in("in.txt");
+    std::ifstream in("in.txt");
     if (!in) qDebug() << "oops";
     int status; in >> status; in.close();
     return status;
@@ -282,6 +282,9 @@ void Battery::keyPressEvent(QKeyEvent *pe)
 
 void Battery::mouseDoubleClickEvent(QMouseEvent *)
 {
-    if (!options) options = new OptionsWnd(this);
+    if (!options) {
+        options = new OptionsWnd(this);
+    }
     options->show();
+    options->move(this->pos());
 }

@@ -3,8 +3,8 @@
 OptionsWnd::OptionsWnd(Battery *parent) : QWidget(parent)
 {
     setWindowFlags(Qt::Tool);
-    setWindowTitle("Options");
 
+    setWindowTitle("Options");
     battery = parent;
     cb_stayOnTop = new QCheckBox("Always on top");
     cb_stayOnTop->setChecked(battery->settings->value("ontop", false).toBool());
@@ -23,4 +23,13 @@ OptionsWnd::OptionsWnd(Battery *parent) : QWidget(parent)
     vbl->addWidget(lbl_1);
     vbl->addWidget(sl_opacity);
     setLayout(vbl);
+    setFixedSize(180, 90);
+}
+
+OptionsWnd::~OptionsWnd()
+{
+    delete vbl;
+    delete lbl_1;
+    delete sl_opacity;
+    delete cb_stayOnTop;
 }

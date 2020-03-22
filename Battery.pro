@@ -24,12 +24,10 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 CONFIG(debug, release|debug):DEFINES += _DEBUG
 
-SOURCES += main.cpp\
-        battery.cpp \
-    optionswnd.cpp
+INCLUDEPATH += $$PWD/inc
 
-HEADERS  += battery.h \
-    optionswnd.h
+HEADERS += $$PWD/inc/*.h
+SOURCES += $$PWD/src/*.cpp
 
 #QMAKE_LFLAGS_RELEASE += -static -static-libgcc
-RESOURCES += res.qrc
+RESOURCES += res/res.qrc
