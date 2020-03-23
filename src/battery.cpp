@@ -96,7 +96,7 @@ bool Battery::isCharging()
         std::string status;
         in >> status;
         in.close();
-        return (status == "true");
+        return (status == "Charging");
     }
     return false;
 #endif
@@ -257,6 +257,7 @@ void Battery::wheelEvent(QWheelEvent *pe)
     move( position );
     configChanged = true;
 }
+
 
 void Battery::mousePressEvent(QMouseEvent *event) {
     m_mc_x = event->x();

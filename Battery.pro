@@ -26,8 +26,8 @@ CONFIG(debug, release|debug):DEFINES += _DEBUG
 
 INCLUDEPATH += $$PWD/inc
 
-HEADERS += $$PWD/inc/*.h
-SOURCES += $$PWD/src/*.cpp
+HEADERS += $$PWD/inc/*
+SOURCES += $$PWD/src/*
 
 #QMAKE_LFLAGS_RELEASE += -static -static-libgcc
 RESOURCES += res/res.qrc

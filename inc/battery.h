@@ -33,7 +33,6 @@ public slots:
 protected:
     void paintEvent(QPaintEvent *);
     void wheelEvent(QWheelEvent *);
-
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
     int m_mc_x, m_mc_y; // mouseclick coord
