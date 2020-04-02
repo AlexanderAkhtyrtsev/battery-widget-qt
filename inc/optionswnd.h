@@ -12,7 +12,7 @@ class OptionsWnd : public QWidget
     QLabel *lbl_1;
     Battery *battery;
 public:
-    explicit OptionsWnd(Battery *parent = 0);
+    explicit OptionsWnd(Battery *parent = nullptr);
     ~OptionsWnd();
 };
 

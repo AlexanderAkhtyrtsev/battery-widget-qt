@@ -11,13 +11,13 @@ Battery::Battery(QWidget *parent)
     configChanged = false;
     settings = new QSettings("AlexanderAkhtyrtsev", "Battery Widget");
     resize( settings->value("wsize", QSize(45, 90)).toSize());
-    setWindowFlags(Qt::Window|Qt::FramelessWindowHint|Qt::Tool);
-    setAttribute(Qt::WA_TranslucentBackground);
     charging_icon = new QPixmap(":/charging.png");
     empty_battery = new QPixmap(":/empty-battery.png");
     m_opacity = settings->value("opacity", 100).toInt();
 
+    setWindowFlags(Qt::Window|Qt::FramelessWindowHint|Qt::Tool);
     setWindowFlag(Qt::WindowStaysOnTopHint, settings->value("ontop", false).toBool());
+    setAttribute(Qt::WA_TranslucentBackground);
 
     timer = new QTimer(this);
     timer->setInterval(2000);
