@@ -15,6 +15,9 @@ public:
     bool isConnected() const;
     bool isCharging();
     int getOpacity() const;
+#ifdef Q_OS_LINUX
+    QString batteryPath;
+#endif
 private:
     int m_opacity;
     QTimer *timer;

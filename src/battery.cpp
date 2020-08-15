@@ -1,4 +1,6 @@
 #include "battery.h"
+#include <iostream>
+using std::cout;
 
 Battery::Battery(QWidget *parent)
     : QWidget(parent)
@@ -23,8 +25,12 @@ Battery::Battery(QWidget *parent)
     timer->setInterval(2000);
     QObject::connect(timer, SIGNAL(timeout()), this, SLOT(check()));
     timer->start();
-
     move(settings->value("wpos", QPoint(QApplication::desktop()->width() - width() - 10, 40)).toPoint());
+
+#ifdef Q_OS_LINUX
+    batteryPath = std::ifstream("/sys/class/power_supply/BAT0/capacity") ? "/sys/class/power_supply/BAT0/capacity" : "/sys/class/power_supply/BAT1/capacity";
+#endif
+
 }
 
 Battery::~Battery()
@@ -45,9 +51,10 @@ int Battery::getStatus()
 #endif
 
 #ifdef Q_OS_LINUX
-    std::ifstream ifs("/sys/class/power_supply/BAT0/capacity");
+    std::ifstream ifs(batteryPath.toStdString());
     int percent;
     if (!ifs.is_open()) {
+        cout << "No battery found :(\n";
         return -1;
     }
     ifs >> percent;
@@ -72,7 +79,7 @@ bool Battery::isConnected() const
 #endif
 
 #ifdef Q_OS_LINUX
-    std::ifstream in("/sys/class/power_supply/BAT0/status");
+    std::ifstream in(batteryPath.toStdString());
     if (in.is_open()) {
         in.close();
         return true;
@@ -91,7 +98,7 @@ bool Battery::isCharging()
     return ps.BatteryFlag & 8;
 #endif
 #ifdef Q_OS_LINUX
-    std::ifstream in("/sys/class/power_supply/BAT0/status");
+    std::ifstream in(batteryPath.toStdString());
     if (in.is_open()) {
         std::string status;
         in >> status;
