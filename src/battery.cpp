@@ -21,15 +21,13 @@ Battery::Battery(QWidget *parent)
     setWindowFlag(Qt::WindowStaysOnTopHint, settings->value("ontop", false).toBool());
     setAttribute(Qt::WA_TranslucentBackground);
 
+    batteryInfo = new BatteryInfo;
+
     timer = new QTimer(this);
     timer->setInterval(2000);
     QObject::connect(timer, SIGNAL(timeout()), this, SLOT(check()));
     timer->start();
     move(settings->value("wpos", QPoint(QApplication::desktop()->width() - width() - 10, 40)).toPoint());
-
-#ifdef Q_OS_LINUX
-    batteryPath = std::ifstream("/sys/class/power_supply/BAT0/capacity") ? "/sys/class/power_supply/BAT0/capacity" : "/sys/class/power_supply/BAT1/capacity";
-#endif
 
 }
 
@@ -39,74 +37,7 @@ Battery::~Battery()
     delete charging_icon;
     delete empty_battery;
     delete settings;
-}
-
-int Battery::getStatus()
-{
-
-#ifdef Q_OS_WIN
-    SYSTEM_POWER_STATUS ps;
-    GetSystemPowerStatus(&ps);
-    return ps.BatteryLifePercent;
-#endif
-
-#ifdef Q_OS_LINUX
-    std::ifstream ifs(batteryPath.toStdString());
-    int percent;
-    if (!ifs.is_open()) {
-        cout << "No battery found :(\n";
-        return -1;
-    }
-    ifs >> percent;
-    ifs.close();
-    return percent;
-#endif
-
-#ifdef _DEBUG
-    std::ifstream in("in.txt");
-    if (!in) qDebug() << "oops";
-    int status; in >> status; in.close();
-    return status;
-#endif
-}
-
-bool Battery::isConnected() const
-{
-#ifdef Q_OS_WIN
-    SYSTEM_POWER_STATUS ps;
-    GetSystemPowerStatus(&ps);
-    return ps.BatteryFlag < 128;
-#endif
-
-#ifdef Q_OS_LINUX
-    std::ifstream in(batteryPath.toStdString());
-    if (in.is_open()) {
-        in.close();
-        return true;
-    }
-    return false;
-#endif
-}
-
-bool Battery::isCharging()
-{
-#ifdef Q_OS_WIN
-
-    SYSTEM_POWER_STATUS ps;
-    GetSystemPowerStatus(&ps);
-    m_ac = ps.ACLineStatus;
-    return ps.BatteryFlag & 8;
-#endif
-#ifdef Q_OS_LINUX
-    std::ifstream in(batteryPath.toStdString());
-    if (in.is_open()) {
-        std::string status;
-        in >> status;
-        in.close();
-        return (status == "Charging");
-    }
-    return false;
-#endif
+    delete batteryInfo;
 }
 
 int Battery::getOpacity() const
@@ -127,7 +58,7 @@ QPoint Battery::validPos(QPoint point)
 void Battery::check()
 {
     // hide widget when battery disconnected
-    if (isConnected()) {
+    if (batteryInfo->isConnected()) {
         if (isHidden()) {
             show();
         }
@@ -145,10 +76,10 @@ void Battery::check()
 
         if (saved_status == -1) {
             elapsedTimer.restart();
-            saved_status = getStatus();
+            saved_status = batteryInfo->getStatus();
         }
-        else if (saved_status != getStatus())  {
-            time_per1 = elapsedTimer.elapsed() / 1000.0 / (saved_status - getStatus());
+        else if (saved_status != batteryInfo->getStatus())  {
+            time_per1 = elapsedTimer.elapsed() / 1000.0 / (saved_status - batteryInfo->getStatus());
             saved_status = -1;
         }
 
@@ -157,13 +88,13 @@ void Battery::check()
             m_ac2 = m_ac;
             saved_status = -1;
         }
-        if (isCharging()) {
+        if (batteryInfo->isCharging()) {
             if (saved_status == -1){
                 elapsedTimer.restart();
-                saved_status = getStatus();
+                saved_status = batteryInfo->getStatus();
             } else {
-                if (saved_status != getStatus()) {
-                    time_ch1 = elapsedTimer.elapsed() / 1000.0 / (getStatus() - saved_status);
+                if (saved_status != batteryInfo->getStatus()) {
+                    time_ch1 = elapsedTimer.elapsed() / 1000.0 / (batteryInfo->getStatus() - saved_status);
                     saved_status = -1;
                 }
             }
@@ -198,7 +129,7 @@ void Battery::pinOnTop(bool b)
 
 void Battery::paintEvent(QPaintEvent *)
 {
-    float s = this->getStatus();
+    float s = batteryInfo->getStatus();
     QBrush brush( s < 21 ? Qt::red : s < 40 ? Qt::yellow : Qt::green );
     QRect r = rect();
 
@@ -219,7 +150,7 @@ void Battery::paintEvent(QPaintEvent *)
 
 
     // Charging icon
-    if ( isCharging() ) {
+    if ( batteryInfo->isCharging() ) {
         painter.save();
         r = rect();
         r = QRect(r.width()*0.25, r.height() * 0.25, r.width() * 0.5, r.height()*0.5);
@@ -243,7 +174,7 @@ void Battery::paintEvent(QPaintEvent *)
             QTime t2(0,0,0); t2 = t2.addSecs(sec);
             timeleft = "\nTime left: " + t2.toString("h") + " h " + t2.toString("m") + " m " + t2.toString("s") + " s";
         }
-    } else if (isCharging() && time_ch1 != -1) {
+    } else if (batteryInfo->isCharging() && time_ch1 != -1) {
         QTime t1(0,0,0); t1 = t1.addSecs(time_ch1 * (100-s));
         timeUntilful = "\nUntil Full: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
     }
@@ -266,12 +197,14 @@ void Battery::wheelEvent(QWheelEvent *pe)
 }
 
 
-void Battery::mousePressEvent(QMouseEvent *event) {
+void Battery::mousePressEvent(QMouseEvent *event)
+{
     m_mc_x = event->x();
     m_mc_y = event->y();
 }
 
-void Battery::mouseMoveEvent(QMouseEvent *event) {
+void Battery::mouseMoveEvent(QMouseEvent *event)
+{
     QPoint pos( event->globalX() - m_mc_x, event->globalY() - m_mc_y);
     QPoint position = validPos(pos);
     move( position );
@@ -281,10 +214,9 @@ void Battery::mouseMoveEvent(QMouseEvent *event) {
 void Battery::keyPressEvent(QKeyEvent *pe)
 {
     switch(pe->key()) {
-    case Qt::Key_Escape:
-        timer->stop();
-        exit(0);
-        break;
+        case Qt::Key_Escape:
+            timer->stop();
+            QApplication::exit(0);
     }
 }
 
@@ -293,6 +225,7 @@ void Battery::mouseDoubleClickEvent(QMouseEvent *)
     if (!options) {
         options = new OptionsWnd(this);
     }
+
     options->show();
     options->move(this->pos());
 }

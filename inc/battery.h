@@ -1,8 +1,6 @@
 #pragma once
-#include <fstream>
-using std::fstream;
 #include "optionswnd.h"
-
+#include "batteryinfo.h"
 
 class Battery : public QWidget
 {
@@ -11,14 +9,11 @@ public:
     Battery(QWidget *parent = nullptr);
     ~Battery();
     QSettings *settings;
-    int getStatus();
-    bool isConnected() const;
-    bool isCharging();
     int getOpacity() const;
-#ifdef Q_OS_LINUX
-    QString batteryPath;
-#endif
+
 private:
+    BatteryInfo *batteryInfo;
+
     int m_opacity;
     QTimer *timer;
     QPixmap *charging_icon;
@@ -29,10 +24,12 @@ private:
     int m_ac, m_ac2, saved_status;
     double time_per1, time_ch1;
     bool configChanged;
+
 public slots:
     void check();
     void setOpacity(int);
     void pinOnTop(bool);
+
 protected:
     void paintEvent(QPaintEvent *);
     void wheelEvent(QWheelEvent *);
