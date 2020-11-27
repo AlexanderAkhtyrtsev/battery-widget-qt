@@ -2,12 +2,20 @@
 #include <iostream>
 #include <fstream>
 
+#ifdef _DEBUG
+
+#define IS_CHARGING true
+#define STATUS 77
+#define CONNECTED true
+
+#endif
 
 
 BatteryInfo::BatteryInfo()
 {
 #ifdef Q_OS_LINUX
-    resourcePath = std::ifstream("/sys/class/power_supply/BAT0/capacity") ? "/sys/class/power_supply/BAT0/capacity" : "/sys/class/power_supply/BAT1/capacity";
+    resourcePath = std::ifstream("/sys/class/power_supply/BAT0/capacity") ?
+                "/sys/class/power_supply/BAT0/capacity" : "/sys/class/power_supply/BAT1/capacity";
 #endif
 }
 
@@ -16,6 +24,10 @@ BatteryInfo::BatteryInfo()
 
 int BatteryInfo::getStatus()
 {
+#ifdef _DEBUG
+    return STATUS;
+#endif
+
 
 #ifdef Q_OS_WIN
     SYSTEM_POWER_STATUS ps;
@@ -36,17 +48,15 @@ int BatteryInfo::getStatus()
     ifs.close();
     return percent;
 #endif
-
-#ifdef _DEBUG
-    std::ifstream in("in.txt");
-    if (!in) qDebug() << "oops";
-    int status; in >> status; in.close();
-    return status;
-#endif
 }
 
 bool BatteryInfo::isConnected() const
 {
+
+#ifdef _DEBUG
+return CONNECTED;
+#endif
+
 #ifdef Q_OS_WIN
     SYSTEM_POWER_STATUS ps;
     GetSystemPowerStatus(&ps);
@@ -66,6 +76,11 @@ bool BatteryInfo::isConnected() const
 
 bool BatteryInfo::isCharging()
 {
+
+#ifdef _DEBUG
+return IS_CHARGING;
+#endif
+
 #ifdef Q_OS_WIN
     SYSTEM_POWER_STATUS ps;
     GetSystemPowerStatus(&ps);

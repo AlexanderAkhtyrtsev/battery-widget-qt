@@ -45,11 +45,13 @@ int Battery::getOpacity() const
     return m_opacity;
 }
 
-QPoint Battery::validPos(QPoint point)
+QPoint Battery::getValidPosition(QPoint point)
 {
-    QPoint valid( point );
+    QPoint valid(point);
     QDesktopWidget *desktop = QApplication::desktop();
-    int w = desktop->width() - width() , h = desktop->height() - height();
+    int w = desktop->width() - width(),
+        h = desktop->height() - height();
+
     valid.setX(qMax(0, qMin(valid.x(), w)));
     valid.setY(qMax(0, qMin(valid.y(), h)));
     return valid;
@@ -168,16 +170,19 @@ void Battery::paintEvent(QPaintEvent *)
     QString onBatteryStr = "", timeleft = "", timeUntilful = "";
     if (!m_ac) {
         QTime t1(0,0,0); t1 = t1.addSecs(elapsedTimer.elapsed() / 1000);
-       onBatteryStr = "\nOn battery: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
+        onBatteryStr = "\nOn battery: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
+
         if (time_per1 != -1) {
             int sec = time_per1 * s;
             QTime t2(0,0,0); t2 = t2.addSecs(sec);
             timeleft = "\nTime left: " + t2.toString("h") + " h " + t2.toString("m") + " m " + t2.toString("s") + " s";
         }
+
     } else if (batteryInfo->isCharging() && time_ch1 != -1) {
         QTime t1(0,0,0); t1 = t1.addSecs(time_ch1 * (100-s));
         timeUntilful = "\nUntil Full: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
     }
+
     this->setToolTip(QString(percentage+timeUntilful+onBatteryStr+timeleft).replace(QRegExp("[\\s]0[\\s][hms]"), ""));
     int fw = fmt.horizontalAdvance(percentage);
     painter.setFont(fnt);
@@ -190,9 +195,9 @@ void Battery::paintEvent(QPaintEvent *)
 void Battery::wheelEvent(QWheelEvent *pe)
 {
     int d = pe->angleDelta().y() > 0 ? 10 : -10;
-    resize( qMax(35, qMin(width()+d/2, 100)), qMax(70, qMin(height()+d, 200)) );
-    QPoint position = validPos(pos());
-    move( position );
+    this->resize( qMax(35, qMin(width()+d/2, 300)), qMax(70, qMin(height()+d, 600)) );
+
+    this->move(this->getValidPosition(pos()));
     configChanged = true;
 }
 
@@ -206,8 +211,7 @@ void Battery::mousePressEvent(QMouseEvent *event)
 void Battery::mouseMoveEvent(QMouseEvent *event)
 {
     QPoint pos( event->globalX() - m_mc_x, event->globalY() - m_mc_y);
-    QPoint position = validPos(pos);
-    move( position );
+    move( this->getValidPosition(pos) );
     configChanged = true;
 }
 

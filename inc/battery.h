@@ -17,7 +17,7 @@ private:
     int m_opacity;
     QTimer *timer;
     QPixmap *charging_icon;
-    QPoint validPos(QPoint);
+    QPoint getValidPosition(QPoint);
     OptionsWnd *options;
     QPixmap *empty_battery;
     QElapsedTimer elapsedTimer;
