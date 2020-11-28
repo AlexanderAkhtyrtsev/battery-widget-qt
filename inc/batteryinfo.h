@@ -1,19 +1,21 @@
 #pragma once
 #include <QApplication>
+#include <QFile>
 
 class BatteryInfo
 {
 public:
 
     bool isConnected() const;
-    bool isCharging();
-    int getStatus();
+    bool isCharging() const;
+    int getCapacity() const;
     BatteryInfo();
+    ~BatteryInfo();
 
 #ifdef Q_OS_LINUX
-
 private:
-    QString resourcePath;
+    QFile *capacity;
+    QFile *status;
 
 #endif
 };

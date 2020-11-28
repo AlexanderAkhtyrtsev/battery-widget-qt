@@ -35,7 +35,7 @@ protected:
     void wheelEvent(QWheelEvent *);
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
-    int m_mc_x, m_mc_y; // mouseclick coord
     void keyPressEvent(QKeyEvent *);
     void mouseDoubleClickEvent(QMouseEvent *event);
+    QPoint clickCoords; // mouseclick coords
 };

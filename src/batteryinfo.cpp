@@ -1,11 +1,20 @@
 #include "batteryinfo.h"
+
+#ifdef Q_OS_LINUX
+#include <QFileInfo>
+#include <QDir>
+
 #include <iostream>
-#include <fstream>
+#include <QDebug>
+#include <QDirIterator>
+#include <QFile>
+#include <QTextStream>
+#endif
 
 #ifdef _DEBUG
 
 #define IS_CHARGING true
-#define STATUS 77
+#define STATUS 17
 #define CONNECTED true
 
 #endif
@@ -13,16 +22,61 @@
 
 BatteryInfo::BatteryInfo()
 {
+
 #ifdef Q_OS_LINUX
-    resourcePath = std::ifstream("/sys/class/power_supply/BAT0/capacity") ?
-                "/sys/class/power_supply/BAT0/capacity" : "/sys/class/power_supply/BAT1/capacity";
+    QString absolutePath = "/sys/class/power_supply/";
+
+    capacity = nullptr;
+    status   = nullptr;
+
+
+    // Find path of battery in proc filesystem.
+
+    QDirIterator it(absolutePath);
+
+    // Iterate through the directory using the QDirIterator
+    while (it.hasNext()) {
+        QString filename = it.next();
+        QFileInfo file(filename);
+
+        if (!file.isDir()) { // Check if it's a dir
+            continue;
+        }
+
+        if (file.fileName().contains(QString("BAT"), Qt::CaseInsensitive)) {
+            absolutePath += file.fileName();
+
+            capacity = new QFile(absolutePath +  "/capacity");
+            status   = new QFile(absolutePath +  "/status");
+
+            capacity->open(QIODevice::ReadOnly);
+            status->open(QIODevice::ReadOnly);
+
+            std::cout << "reading data from " << absolutePath.toStdString() << std::endl;
+            break;
+        }
+    }
+
+    if (!status || !capacity) {
+        std::cerr << "no battery connected :(";
+    }
+#endif
+}
+
+
+BatteryInfo::~BatteryInfo()
+{
+#ifdef Q_OS_LINUX
+    status->close();
+    capacity->close();
+    delete status;
+    delete capacity;
 #endif
 }
 
 
 
-
-int BatteryInfo::getStatus()
+int BatteryInfo::getCapacity() const
 {
 #ifdef _DEBUG
     return STATUS;
@@ -36,16 +90,16 @@ int BatteryInfo::getStatus()
 #endif
 
 #ifdef Q_OS_LINUX
-    std::ifstream ifs(resourcePath.toStdString());
-    int percent;
 
-    if (!ifs.is_open()) {
+    if (!this->capacity || !this->capacity->isOpen()) {
         std::cerr << "No battery found :(\n";
         return -1;
     }
 
-    ifs >> percent;
-    ifs.close();
+    QTextStream in(capacity);
+    in.seek(0);
+    int percent;
+    in >> percent;
     return percent;
 #endif
 }
@@ -64,17 +118,11 @@ return CONNECTED;
 #endif
 
 #ifdef Q_OS_LINUX
-    std::ifstream in(resourcePath.toStdString());
-    if (in.is_open()) {
-        in.close();
-        return true;
-    }
-
-    return false;
+    return this->status && this->status->isOpen();
 #endif
 }
 
-bool BatteryInfo::isCharging()
+bool BatteryInfo::isCharging() const
 {
 
 #ifdef _DEBUG
@@ -89,12 +137,13 @@ return IS_CHARGING;
 #endif
 
 #ifdef Q_OS_LINUX
-    std::ifstream in(resourcePath.toStdString());
-    if (in.is_open()) {
-        std::string status;
+
+    if (this->status && this->status->isOpen()) {
+        QTextStream in(status);
+        in.seek(0);
+        QString status;
         in >> status;
-        in.close();
-        return (status == "Charging");
+        return status == "Charging";
     }
 
     return false;

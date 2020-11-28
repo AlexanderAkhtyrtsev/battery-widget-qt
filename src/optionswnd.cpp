@@ -13,8 +13,7 @@ OptionsWnd::OptionsWnd(Battery *parent) : QWidget(parent)
     lbl_1 = new QLabel("Opacity");
 
     sl_opacity = new QSlider(Qt::Horizontal);
-    sl_opacity->setMinimum(15);
-    sl_opacity->setMaximum(100);
+    sl_opacity->setRange(15, 100);
     sl_opacity->setValue(battery->getOpacity());
     QObject::connect(sl_opacity, SIGNAL(valueChanged(int)), battery, SLOT(setOpacity(int)));
 

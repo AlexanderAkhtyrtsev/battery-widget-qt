@@ -28,7 +28,6 @@ Battery::Battery(QWidget *parent)
     QObject::connect(timer, SIGNAL(timeout()), this, SLOT(check()));
     timer->start();
     move(settings->value("wpos", QPoint(QApplication::desktop()->width() - width() - 10, 40)).toPoint());
-
 }
 
 Battery::~Battery()
@@ -64,6 +63,7 @@ void Battery::check()
         if (isHidden()) {
             show();
         }
+
         repaint();
     }
     else if (!isHidden()) {
@@ -78,10 +78,10 @@ void Battery::check()
 
         if (saved_status == -1) {
             elapsedTimer.restart();
-            saved_status = batteryInfo->getStatus();
+            saved_status = batteryInfo->getCapacity();
         }
-        else if (saved_status != batteryInfo->getStatus())  {
-            time_per1 = elapsedTimer.elapsed() / 1000.0 / (saved_status - batteryInfo->getStatus());
+        else if (saved_status != batteryInfo->getCapacity())  {
+            time_per1 = elapsedTimer.elapsed() / 1000.0 / (saved_status - batteryInfo->getCapacity());
             saved_status = -1;
         }
 
@@ -90,16 +90,18 @@ void Battery::check()
             m_ac2 = m_ac;
             saved_status = -1;
         }
+
         if (batteryInfo->isCharging()) {
             if (saved_status == -1){
                 elapsedTimer.restart();
-                saved_status = batteryInfo->getStatus();
+                saved_status = batteryInfo->getCapacity();
             } else {
-                if (saved_status != batteryInfo->getStatus()) {
-                    time_ch1 = elapsedTimer.elapsed() / 1000.0 / (batteryInfo->getStatus() - saved_status);
+                if (saved_status != batteryInfo->getCapacity()) {
+                    time_ch1 = elapsedTimer.elapsed() / 1000.0 / (batteryInfo->getCapacity() - saved_status);
                     saved_status = -1;
                 }
             }
+
         } else if(time_ch1 != -1) {
             time_ch1 = -1;
         }
@@ -131,7 +133,7 @@ void Battery::pinOnTop(bool b)
 
 void Battery::paintEvent(QPaintEvent *)
 {
-    float s = batteryInfo->getStatus();
+    float s = batteryInfo->getCapacity();
     QBrush brush( s < 21 ? Qt::red : s < 40 ? Qt::yellow : Qt::green );
     QRect r = rect();
 
@@ -204,14 +206,13 @@ void Battery::wheelEvent(QWheelEvent *pe)
 
 void Battery::mousePressEvent(QMouseEvent *event)
 {
-    m_mc_x = event->x();
-    m_mc_y = event->y();
+    clickCoords = event->pos();
 }
 
 void Battery::mouseMoveEvent(QMouseEvent *event)
 {
-    QPoint pos( event->globalX() - m_mc_x, event->globalY() - m_mc_y);
-    move( this->getValidPosition(pos) );
+    QPoint pos( event->globalX() - clickCoords.x(), event->globalY() - clickCoords.y());
+    this->move( this->getValidPosition(pos) );
     configChanged = true;
 }
 
