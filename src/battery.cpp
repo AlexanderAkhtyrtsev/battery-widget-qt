@@ -5,22 +5,23 @@ using std::cout;
 Battery::Battery(QWidget *parent)
     : QWidget(parent)
 {
-    options = 0;
-    m_ac2 = -1;
-    saved_status = -1;
-    time_per1 = -1;
-    time_ch1 = -1;
+    options = nullptr;
+
+    savedStatus = 0;
+    percentTime = 0;
     configChanged = false;
+    ACStatus = false;
     settings = new QSettings("AlexanderAkhtyrtsev", "Battery Widget");
+
     resize( settings->value("wsize", QSize(45, 90)).toSize());
-    charging_icon = new QPixmap(":/charging.png");
-    empty_battery = new QPixmap(":/empty-battery.png");
+
     m_opacity = settings->value("opacity", 100).toInt();
 
     setWindowFlags(Qt::Window|Qt::FramelessWindowHint|Qt::Tool);
     setWindowFlag(Qt::WindowStaysOnTopHint, settings->value("ontop", false).toBool());
     setAttribute(Qt::WA_TranslucentBackground);
 
+    resource = new Resource;
     batteryInfo = new BatteryInfo;
 
     timer = new QTimer(this);
@@ -33,10 +34,10 @@ Battery::Battery(QWidget *parent)
 Battery::~Battery()
 {
     delete options;
-    delete charging_icon;
-    delete empty_battery;
+    delete resource;
     delete settings;
     delete batteryInfo;
+    delete timer;
 }
 
 int Battery::getOpacity() const
@@ -44,7 +45,7 @@ int Battery::getOpacity() const
     return m_opacity;
 }
 
-QPoint Battery::getValidPosition(QPoint point)
+QPoint Battery::getValidPosition(const QPoint point)
 {
     QPoint valid(point);
     QDesktopWidget *desktop = QApplication::desktop();
@@ -58,6 +59,9 @@ QPoint Battery::getValidPosition(QPoint point)
 
 void Battery::check()
 {
+    const auto currentCapacity = this->batteryInfo->getCapacity();
+    const int delta = savedStatus - currentCapacity;
+
     // hide widget when battery disconnected
     if (batteryInfo->isConnected()) {
         if (isHidden()) {
@@ -67,45 +71,46 @@ void Battery::check()
         repaint();
     }
     else if (!isHidden()) {
-      //  hide();
+        hide();
+        std::cout << "widget was hidden cause battery is disconnected.\n";
     }
 
-    if (!m_ac) {
-        if (m_ac != m_ac2) { // when ac disconnected
-            m_ac2 = m_ac;
-            elapsedTimer.restart();
+    // Check if AC status changed
+    if (batteryInfo->isCharging() != ACStatus) {
+        elapsedTimer.restart();
+        ACStatus = batteryInfo->isCharging();
+        savedStatus = 0;
+        percentTime = 0;
+    }
+
+
+    if (batteryInfo->isDischarging()) {
+
+        // Capacity undefined
+        if (!savedStatus) {
+            savedStatus = currentCapacity;
         }
 
-        if (saved_status == -1) {
-            elapsedTimer.restart();
-            saved_status = batteryInfo->getCapacity();
-        }
-        else if (saved_status != batteryInfo->getCapacity())  {
-            time_per1 = elapsedTimer.elapsed() / 1000.0 / (saved_status - batteryInfo->getCapacity());
-            saved_status = -1;
+        // Capacity changed
+        else if (savedStatus != currentCapacity)  {
+            percentTime = elapsedTimer.elapsed() / 1000.0 / delta;
+            savedStatus = currentCapacity;
         }
 
-    } else {
-        if (m_ac != m_ac2) { // when AC connected
-            m_ac2 = m_ac;
-            saved_status = -1;
-        }
-
-        if (batteryInfo->isCharging()) {
-            if (saved_status == -1){
-                elapsedTimer.restart();
-                saved_status = batteryInfo->getCapacity();
-            } else {
-                if (saved_status != batteryInfo->getCapacity()) {
-                    time_ch1 = elapsedTimer.elapsed() / 1000.0 / (batteryInfo->getCapacity() - saved_status);
-                    saved_status = -1;
-                }
+    } else if (batteryInfo->isCharging()) {
+        if (!savedStatus){
+            savedStatus = currentCapacity;
+        } else {
+            if (savedStatus != currentCapacity) {
+                percentTime = elapsedTimer.elapsed() / 1000.0 / (currentCapacity - savedStatus);
+                savedStatus = currentCapacity;
             }
-
-        } else if(time_ch1 != -1) {
-            time_ch1 = -1;
         }
+    } else {
+        // if status is unknown or battery is full
+        savedStatus = 0;
     }
+
 
 
     if (configChanged) {
@@ -133,8 +138,8 @@ void Battery::pinOnTop(bool b)
 
 void Battery::paintEvent(QPaintEvent *)
 {
-    float s = batteryInfo->getCapacity();
-    QBrush brush( s < 21 ? Qt::red : s < 40 ? Qt::yellow : Qt::green );
+    const auto capacity = batteryInfo->getCapacity();
+    QBrush brush( capacity < 21 ? Qt::red : capacity < 40 ? Qt::yellow : Qt::green );
     QRect r = rect();
 
     QPainter painter(this);
@@ -142,14 +147,14 @@ void Battery::paintEvent(QPaintEvent *)
     painter.setOpacity((qreal)(m_opacity)/100);
 
     // drawing empty battery
-    painter.setBrush( QBrush(empty_battery->scaled(r.width(), r.height())) );
+    painter.setBrush( QBrush(resource->getEmptyBattery()->scaled(r.width(), r.height())) );
     painter.setPen(Qt::NoPen);
     painter.drawRect(r);
 
     // Drawing status
     painter.setCompositionMode(QPainter::CompositionMode_SourceAtop);
     painter.setBrush(brush);
-    r.adjust(0, r.height()*(1 - s / 100), 0, 0);
+    r.adjust(0, r.height() * (100 - capacity)  / 100, 0, 0);
     painter.drawRect(r);
 
 
@@ -159,7 +164,7 @@ void Battery::paintEvent(QPaintEvent *)
         r = rect();
         r = QRect(r.width()*0.25, r.height() * 0.25, r.width() * 0.5, r.height()*0.5);
         painter.setOpacity(painter.opacity() * 0.5);
-        painter.drawPixmap(r, *charging_icon);
+        painter.drawPixmap(r, *resource->getChargingIcon());
         painter.restore();
     }
 
@@ -167,25 +172,29 @@ void Battery::paintEvent(QPaintEvent *)
     fnt.setPixelSize(rect().height() * 0.15);
     QFontMetrics fmt(fnt);
 
-    QString percentage = QString::number(s) + "%";
-    //TODO: timeleft
-    QString onBatteryStr = "", timeleft = "", timeUntilful = "";
-    if (!m_ac) {
+    QString percentage = QString::number(capacity) + "%";
+
+
+    QString onBatteryStr = "",
+            timeleft     = "",
+            timeUntilful = "";
+
+    if (this->batteryInfo->isDischarging()) {
         QTime t1(0,0,0); t1 = t1.addSecs(elapsedTimer.elapsed() / 1000);
         onBatteryStr = "\nOn battery: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
 
-        if (time_per1 != -1) {
-            int sec = time_per1 * s;
+        if (percentTime) {
+            int sec = percentTime * capacity;
             QTime t2(0,0,0); t2 = t2.addSecs(sec);
             timeleft = "\nTime left: " + t2.toString("h") + " h " + t2.toString("m") + " m " + t2.toString("s") + " s";
         }
 
-    } else if (batteryInfo->isCharging() && time_ch1 != -1) {
-        QTime t1(0,0,0); t1 = t1.addSecs(time_ch1 * (100-s));
+    } else if (batteryInfo->isCharging() && percentTime) {
+        QTime t1(0,0,0); t1 = t1.addSecs(percentTime * (100 - capacity));
         timeUntilful = "\nUntil Full: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
     }
 
-    this->setToolTip(QString(percentage+timeUntilful+onBatteryStr+timeleft).replace(QRegExp("[\\s]0[\\s][hms]"), ""));
+    this->setToolTip(QString(percentage + timeUntilful + onBatteryStr + timeleft).replace(QRegExp("[\\s]0[\\s][hms]"), ""));
     int fw = fmt.horizontalAdvance(percentage);
     painter.setFont(fnt);
     painter.setPen(QPen(Qt::black));
@@ -199,6 +208,7 @@ void Battery::wheelEvent(QWheelEvent *pe)
     int d = pe->angleDelta().y() > 0 ? 10 : -10;
     this->resize( qMax(35, qMin(width()+d/2, 300)), qMax(70, qMin(height()+d, 600)) );
 
+    // fix position, dont let move over desktop
     this->move(this->getValidPosition(pos()));
     configChanged = true;
 }
@@ -233,4 +243,27 @@ void Battery::mouseDoubleClickEvent(QMouseEvent *)
 
     options->show();
     options->move(this->pos());
+}
+
+
+Resource::Resource()
+{
+    chargingIcon = new QPixmap(":/charging.png");
+    emptyBattery = new QPixmap(":/empty-battery.png");
+}
+
+Resource::~Resource()
+{
+    delete chargingIcon;
+    delete emptyBattery;
+}
+
+QPixmap *Resource::getChargingIcon() const
+{
+    return chargingIcon;
+}
+
+QPixmap *Resource::getEmptyBattery() const
+{
+    return emptyBattery;
 }

@@ -2,6 +2,19 @@
 #include "optionswnd.h"
 #include "batteryinfo.h"
 
+class Resource
+{
+public:
+    Resource();
+    ~Resource();
+    QPixmap *getChargingIcon() const;
+    QPixmap *getEmptyBattery() const;
+private:
+    QPixmap *chargingIcon;
+    QPixmap *emptyBattery;
+};
+
+
 class Battery : public QWidget
 {
     Q_OBJECT
@@ -15,14 +28,16 @@ private:
     BatteryInfo *batteryInfo;
 
     int m_opacity;
+    bool ACStatus;
     QTimer *timer;
-    QPixmap *charging_icon;
-    QPoint getValidPosition(QPoint);
+    Resource *resource;
+
+
+    QPoint getValidPosition(const QPoint);
     OptionsWnd *options;
-    QPixmap *empty_battery;
     QElapsedTimer elapsedTimer;
-    int m_ac, m_ac2, saved_status;
-    double time_per1, time_ch1;
+    int savedStatus;
+    double percentTime;
     bool configChanged;
 
 public slots:

@@ -11,13 +11,6 @@
 #include <QTextStream>
 #endif
 
-#ifdef _DEBUG
-
-#define IS_CHARGING true
-#define STATUS 17
-#define CONNECTED true
-
-#endif
 
 
 BatteryInfo::BatteryInfo()
@@ -25,7 +18,9 @@ BatteryInfo::BatteryInfo()
 
 #ifdef Q_OS_LINUX
     QString absolutePath = "/sys/class/power_supply/";
-
+#ifdef _DEBUG
+    absolutePath = "/home/seven/";
+#endif
     capacity = nullptr;
     status   = nullptr;
 
@@ -67,8 +62,8 @@ BatteryInfo::BatteryInfo()
 BatteryInfo::~BatteryInfo()
 {
 #ifdef Q_OS_LINUX
-    status->close();
-    capacity->close();
+    if(status) status->close();
+    if (capacity)capacity->close();
     delete status;
     delete capacity;
 #endif
@@ -78,11 +73,6 @@ BatteryInfo::~BatteryInfo()
 
 int BatteryInfo::getCapacity() const
 {
-#ifdef _DEBUG
-    return STATUS;
-#endif
-
-
 #ifdef Q_OS_WIN
     SYSTEM_POWER_STATUS ps;
     GetSystemPowerStatus(&ps);
@@ -104,13 +94,23 @@ int BatteryInfo::getCapacity() const
 #endif
 }
 
+#ifdef Q_OS_LINUX
+const QString BatteryInfo::readStatus() const
+{
+    QString currentStatus = "";
+
+    if (this->status && this->status->isOpen()) {
+        QTextStream in(this->status);
+        in.seek(0);
+        in >> currentStatus;
+    }
+
+    return currentStatus;
+}
+
+#endif
 bool BatteryInfo::isConnected() const
 {
-
-#ifdef _DEBUG
-return CONNECTED;
-#endif
-
 #ifdef Q_OS_WIN
     SYSTEM_POWER_STATUS ps;
     GetSystemPowerStatus(&ps);
@@ -124,28 +124,26 @@ return CONNECTED;
 
 bool BatteryInfo::isCharging() const
 {
-
-#ifdef _DEBUG
-return IS_CHARGING;
-#endif
-
 #ifdef Q_OS_WIN
     SYSTEM_POWER_STATUS ps;
     GetSystemPowerStatus(&ps);
-    m_ac = ps.ACLineStatus;
     return ps.BatteryFlag & 8;
 #endif
 
 #ifdef Q_OS_LINUX
+    return this->readStatus() == "Charging";
+#endif
+}
 
-    if (this->status && this->status->isOpen()) {
-        QTextStream in(status);
-        in.seek(0);
-        QString status;
-        in >> status;
-        return status == "Charging";
-    }
+bool BatteryInfo::isDischarging() const
+{
+#ifdef Q_OS_WIN
+    SYSTEM_POWER_STATUS ps;
+    GetSystemPowerStatus(&ps);
+    return (ps.BatteryFlag != 255 && ps.BatteryFlag != 128 && !(ps.BatteryFlag & 8));
+#endif
 
-    return false;
+#ifdef Q_OS_LINUX
+    return this->readStatus() == "Discharging";
 #endif
 }
