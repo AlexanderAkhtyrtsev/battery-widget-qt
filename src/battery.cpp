@@ -1,4 +1,4 @@
-#include "battery.h"
+﻿#include "battery.h"
 #include <iostream>
 using std::cout;
 
@@ -174,24 +174,27 @@ void Battery::paintEvent(QPaintEvent *)
 
     QString percentage = QString::number(capacity) + "%";
 
+    auto getTimeStr = [](const QString &title, const QTime &time){
+        return QString("\n" + title + ": " + (time.hour() ? time.toString("h") + "h " : "") + time.toString("m") + "m");
+    };
 
     QString onBatteryStr = "",
             timeleft     = "",
             timeUntilful = "";
 
     if (this->batteryInfo->isDischarging()) {
-        QTime t1(0,0,0); t1 = t1.addSecs(elapsedTimer.elapsed() / 1000);
-        onBatteryStr = "\nOn battery: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
+        QTime time(0,0,0); time = time.addSecs(elapsedTimer.elapsed() / 1000);
+        onBatteryStr = getTimeStr("On battery", time);
 
         if (percentTime) {
             int sec = percentTime * capacity;
-            QTime t2(0,0,0); t2 = t2.addSecs(sec);
-            timeleft = "\nTime left: " + t2.toString("h") + " h " + t2.toString("m") + " m " + t2.toString("s") + " s";
+            QTime time(0,0,0); time = time.addSecs(sec);
+            timeleft = getTimeStr("Time left", time);
         }
 
     } else if (batteryInfo->isCharging() && percentTime) {
-        QTime t1(0,0,0); t1 = t1.addSecs(percentTime * (100 - capacity));
-        timeUntilful = "\nUntil Full: " + t1.toString("h") + " h " + t1.toString("m") + " m " + t1.toString("s") + " s";
+        QTime time(0,0,0); time = time.addSecs(percentTime * (100 - capacity));
+        timeUntilful = getTimeStr("Until Full", time);
     }
 
     this->setToolTip(QString(percentage + timeUntilful + onBatteryStr + timeleft).replace(QRegExp("[\\s]0[\\s][hms]"), ""));
